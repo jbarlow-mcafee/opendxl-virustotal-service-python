@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 import os
-import base64
 import json
 import re
 import sys
@@ -25,14 +24,20 @@ import dxlvtapiservice
 import requests_mock
 
 
-class StringMatches(str):
+class StringMatches(object):
+    def __init__(self, pattern):
+        self.pattern = pattern
+
     def __eq__(self, other):
-        return self in other
+        return re.match(self.pattern, other, re.DOTALL)
 
 
-class StringDoesNotMatch(str):
+class StringDoesNotMatch(object):
+    def __init__(self, pattern):
+        self.pattern = pattern
+
     def __eq__(self, other):
-        return self not in other
+        return not re.match(self.pattern, other)
 
 
 CONF_FILE_NAME = os.path.dirname(os.path.realpath(__file__)) + '/../config/dxlvtapiservice.config'
@@ -45,20 +50,22 @@ class VirusTotalTests(unittest.TestCase):
     """
 
     _TEST_HOSTNAME = "www.virustotal.com"
-    _TEST_API_KEY = "myspecialkey"
-    # _TEST_API_PORT = "443"
-    _TEST_API_USER = "myspecialuser"
+    _TEST_API_KEY = "mytestkey"
+    _TEST_URL = "http://www.virustotal.com"
+    _TEST_RESOURCE = "1234567890"
+    _TEST_IP = "127.0.0.1"
+    _TEST_DOMAIN = "027.ru"
 
     def get_api_endpoint(self, path):
         return "https://" + self._TEST_HOSTNAME + \
                "/" + path
 
     @staticmethod
-    def expected_print_output(title, detail):
-        return_value = title + json.dumps(
-            detail, sort_keys=True,
-            separators=(".*", ": ")).replace("{", ".*")
-        return re.sub(r"[\[}\]]", "", return_value)
+    def expected_print_output(detail):
+        json_string = json.dumps(detail, sort_keys=True,
+                                 separators=(".*", ": "))
+        return re.sub("(\.\*)+", ".*",
+                      re.sub(r"[{[\]}]", ".*", json_string))
 
     @staticmethod
     def _run_sample(app, sample_file):
@@ -71,17 +78,16 @@ class VirusTotalTests(unittest.TestCase):
 
     def run_sample(self, sample_file, add_request_mocks_fn):
 
-        # sample_file1 = os.path.dirname(os.path.realpath(__file__)) + "/../config/dxlvtapiservice.config"
-
-
-        # dxlvtapiservice.VirusTotalApiService.VTAPI_URL_FORMAT="https://" + self._TEST_HOSTNAME + ":" + self._TEST_API_PORT + \
-        #                                                      "/"
-        # with dxlvtapiservice.VirusTotalApiService(os.path.dirname(os.path.realpath(__file__))) as app, \
         with dxlvtapiservice.VirusTotalApiService("sample") as app, \
                 NamedTemporaryFile(mode="w+", delete=False) as temp_config_file:
             config = ConfigParser()
             config.read(app._app_config_path)
-            # config.read(os.path.dirname(os.path.realpath(__file__)) + "/../config/dxlvtapiservice.config")
+
+            if not config.has_section(
+                    dxlvtapiservice.VirusTotalApiService.GENERAL_CONFIG_SECTION):
+                config.add_section(
+                    dxlvtapiservice.VirusTotalApiService.GENERAL_CONFIG_SECTION)
+
             use_mock_requests = not config.has_option(
                 dxlvtapiservice.VirusTotalApiService.GENERAL_CONFIG_SECTION,
                 dxlvtapiservice.VirusTotalApiService.GENERAL_API_KEY_CONFIG_PROP
@@ -96,7 +102,6 @@ class VirusTotalTests(unittest.TestCase):
                     self._TEST_API_KEY
                 )
                 config.write(temp_config_file)
-                # temp_config_file.flush()
                 temp_config_file.close()
                 app._app_config_path = temp_config_file.name
                 with requests_mock.mock(case_sensitive=True) as req_mock:
@@ -108,130 +113,269 @@ class VirusTotalTests(unittest.TestCase):
                 req_mock = None
         return (mock_print, req_mock)
 
-    #################################################################################################################
 
-    # def test_basic_domain_report_example(self):  # pylint: disable=no-self-use
-    #     """
-    #         Tests the example basic_domain_report_example.py by assessing positive and negative scenarios.
-    #     """
-    #     config = ConfigParser()
-    #     config.read(CONF_FILE_NAME)
-    #     sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_domain_report_example.py"
-    #     #sample_file1 = os.path.dirname(os.path.realpath(__file__)) + "/../config/dxlvtapiservice.config"
-    #     apiKey = config.get('General', 'apiKey')
-    #     #The following condition determines if the API key is provided in dxlvtapiservice.config.
-    #     #When the API key is present, the real service will be invoked. Otherwise the mock service will be invoked.
-    #     if apiKey :
-    #         sample_globals = {"__file__": sample_file}
-    #         with dxlvtapiservice.VirusTotalApiService("config") as app:
-    #             app.run
-    #             with open(sample_file) as file, \
-    #                     patch.object(builtins, 'print') as mock_print:
-    #                 exec (file.read(), sample_globals)  # pylint: disable=exec-used
-    #         mock_print.assert_called_with(StringMatches("BitDefender category"))
-    #         mock_print.assert_called_with(
-    #             StringDoesNotMatch("Error invoking service"))
-    #     else:
-    #         print "Invoke mock object"
-    #
-    #         assert False, "Error invoking service"
-
-    #################################################################################################################
-
-    def test_basic_domain_example(self):
-        # mock_domain_id = "apikey=mysecretkey"
+    def test_basic_domain_report_example(self):
+        """
+            Tests the example basic_domain_report_example.py by assessing positive and negative scenarios.
+        """
         mock_domain_id = "123456"
-        mock_api_password = "mysecretpassword"
         expected_domain_detail = {
             "BitDefender category": "parked",
             "Dr.Web category": "known infection source",
             "Forcepoint ThreatSeeker category": "uncategorized",
             "Websense ThreatSeeker category": "uncategorized",
-            "Webutation domain info": {"Adult content": "yes", "Safety score": 41, "Verdict": "malicious"},
+            "Webutation domain info": {"Adult content": "yes", "Verdict": "malicious"},
             "categories": ["parked", "uncategorized"]
         }
 
-        def add_create_domain_request_mocks(req_mock):
+        def add_create_request_mocks(req_mock):
             domain_detail_with_id = expected_domain_detail.copy()
             domain_detail_with_id["id"] = mock_domain_id
             domain_json_with_id = json.dumps(domain_detail_with_id)
-            req_mock.post(self.get_api_endpoint("vtapi/v2/domain/report"),
-                          text=domain_json_with_id)
             req_mock.get(
                 self.get_api_endpoint("vtapi/v2/domain/report".format(mock_domain_id)),
                 text=domain_json_with_id)
-            print "Executed add_create_domain_request_mocks"
-            # check  self._app.VTAPI_URL_FORMAT
 
         sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_domain_report_example.py"
-        print "Sample file ", sample_file
 
         mock_print, req_mock = self.run_sample(
             sample_file,
-            add_create_domain_request_mocks
-        )
-
-        if req_mock:
-            request_count = len(req_mock.request_history)
-            # self.assertEqual(1, request_count)
-
-            new_domain_request = req_mock.request_history[0]
-            new_domain_request_payload = new_domain_request.json
-            domain_detail_with_source_ref = expected_domain_detail.copy()
-            domain_detail_with_source_ref["sourceRef"] = \
-                new_domain_request_payload.get("sourceRef", "bogus")
-            self.assertEqual(domain_detail_with_source_ref,
-                             new_domain_request_payload)
-
-            expected_creds = "Basic {}".format(base64.b64encode(
-                "{}:{}".format(self._TEST_API_KEY,
-                               mock_api_password).encode("utf8")).decode("utf8"))
-            for request in req_mock.request_history:
-                self.assertEqual(expected_creds,
-                                 request.headers["Authorization"])
-
-        mock_print.assert_any_call(
-            StringMatches(
-                self.expected_print_output(
-                    "Response for the create domain request:",
-                    expected_domain_detail
-                )
-            )
-        )
-        mock_print.assert_any_call(
-            StringMatches(
-                self.expected_print_output(
-                    "Response for the get domain request:", expected_domain_detail
-                )
-            )
-        )
-        mock_print.assert_any_call(StringDoesNotMatch("Error invoking request"))
-
-        def add_search_domain_request_mocks(req_mock):
-            req_mock.get(self.get_api_endpoint("vtapi/v2/domain/report?domain=027.ru&apikey=--api-key--"),
-                         text=json.dumps(expected_domain_detail))
-
-        mock_print, req_mock = self.run_sample(
-            "sample/basic/basic_domain_report_example.py",
-            add_search_domain_request_mocks
+            add_create_request_mocks
         )
 
         if req_mock:
             request_count = len(req_mock.request_history)
             self.assertEqual(1, request_count)
 
-            search_domain_request = req_mock.request_history[0]
-            self.assertEqual({
-                "query": {"_string": "BitDefender category"}
-            }, search_domain_request.json())
+            new_domain_request = req_mock.request_history[0]
+            expected_domain_request = {"domain": [self._TEST_DOMAIN],
+                                       "apikey": [self._TEST_API_KEY]}
+            self.assertEqual(expected_domain_request,
+                             new_domain_request.qs)
+
+        mock_print.assert_called_once_with(
+            StringMatches(self.expected_print_output(expected_domain_detail))
+        )
+        mock_print.assert_called_once_with(
+            StringDoesNotMatch("Error invoking request")
+        )
 
 
-        # mock_print.assert_any_call(
-        #     StringMatches(
-        #         self.expected_print_output(
-        #             "Response for the search domain request:",
-        #             expected_domain_detail
-        #         )
-        #     )
-        # )
-        mock_print.assert_any_call(StringDoesNotMatch("Error invoking request"))
+    def test_basic_file_report_example(self):
+        """
+            Tests the example basic_file_report_example.py by assessing positive and negative scenarios.
+        """
+        mock_req_id = "123456"
+        expected_req_detail = {
+            "md5": "7657fcb7d772448a6d8504e4b20168b8",
+            "resource": "7657fcb7d772448a6d8504e4b20168b8",
+            "response_code": 1
+        }
+
+        def add_create_request_mocks(req_mock):
+            req_detail_with_id = expected_req_detail.copy()
+            req_detail_with_id["id"] = mock_req_id
+            req_json_with_id = json.dumps(req_detail_with_id)
+            req_mock.get(
+                self.get_api_endpoint("vtapi/v2/file/report".format(mock_req_id)),
+                text=req_json_with_id)
+
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_file_report_example.py"
+
+        mock_print, req_mock = self.run_sample(
+            sample_file,
+            add_create_request_mocks
+        )
+
+        if req_mock:
+            request_count = len(req_mock.request_history)
+            self.assertEqual(1, request_count)
+
+            new_file_request = req_mock.request_history[0]
+            expected_request = {"apikey": [self._TEST_API_KEY],
+                                "resource": [self._TEST_RESOURCE]
+                                }
+            self.assertEqual(expected_request,
+                             new_file_request.qs)
+
+        mock_print.assert_called_once_with(
+            StringMatches(self.expected_print_output(expected_req_detail))
+        )
+        mock_print.assert_called_once_with(
+            StringDoesNotMatch("Error invoking request")
+        )
+
+
+    def test_basic_file_rescan_example(self):
+        """
+            Tests the example basic_file_rescan_example.py by assessing positive and negative scenarios.
+        """
+        mock_req_id = "123456"
+        expected_req_detail = {
+            "resource": "7657fcb7d772448a6d8504e4b20168b8",
+            "response_code": 1,
+            "sha256": "54bc950d46a0d1aa72048a17c8275743209e6c17bdacfc4cb9601c9ce3ec9a71" }
+
+        def add_create_request_mocks(req_mock):
+            req_detail_with_id = expected_req_detail.copy()
+            req_detail_with_id["id"] = mock_req_id
+            req_json_with_id = json.dumps(req_detail_with_id)
+            req_mock.get(
+                self.get_api_endpoint("vtapi/v2/file/rescan".format(mock_req_id)),
+                text=req_json_with_id)
+
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_file_rescan_example.py"
+
+        mock_print, req_mock = self.run_sample(
+            sample_file,
+            add_create_request_mocks
+        )
+
+        if req_mock:
+            request_count = len(req_mock.request_history)
+            self.assertEqual(1, request_count)
+
+            new_request = req_mock.request_history[0]
+            expected_request = {"apikey": [self._TEST_API_KEY],
+                                 "resource": [self._TEST_RESOURCE]
+                                }
+            self.assertEqual(expected_request,
+                             new_request.qs)
+
+        mock_print.assert_called_once_with(
+            StringMatches(self.expected_print_output(expected_req_detail))
+        )
+        mock_print.assert_called_once_with(
+            StringDoesNotMatch("Error invoking request")
+        )
+
+
+    def test_basic_ip_address_report_example(self):
+        """
+            Tests the example basic_ip_address_report_example.py by assessing positive and negative scenarios.
+        """
+        mock_req_id = "123456"
+        expected_detail = {
+            "as_owner": ".masterhost autonomous system",
+            "asn": 25532,
+            "country": "RU" }
+
+        def add_create_request_mocks(req_mock):
+            req_detail_with_id = expected_detail.copy()
+            req_detail_with_id["id"] = mock_req_id
+            req_json_with_id = json.dumps(req_detail_with_id)
+            req_mock.get(
+                self.get_api_endpoint("vtapi/v2/ip-address/report".format(mock_req_id)),
+                text=req_json_with_id)
+            print "Executed add_create_request_mocks"
+            # check  self._app.VTAPI_URL_FORMAT
+
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_ip_address_report_example.py"
+
+        mock_print, req_mock = self.run_sample(
+            sample_file,
+            add_create_request_mocks
+        )
+
+        if req_mock:
+            request_count = len(req_mock.request_history)
+            self.assertEqual(1, request_count)
+
+            new_domain_request = req_mock.request_history[0]
+            expected_domain_request = {"ip": [self._TEST_IP],
+                                       "apikey": [self._TEST_API_KEY]}
+            self.assertEqual(expected_domain_request,
+                             new_domain_request.qs)
+
+        mock_print.assert_called_once_with(
+            StringMatches(self.expected_print_output(expected_detail))
+        )
+        mock_print.assert_called_once_with(
+            StringDoesNotMatch("Error invoking request")
+        )
+
+
+    def test_basic_url_report_example(self):
+        """
+            Tests the example basic_url_report_example.py by assessing positive and negative scenarios.
+        """
+        mock_req_id = "123456"
+        expected_req_detail = {
+            "positives": 0,
+            "resource": "http://www.virustotal.com"
+            }
+
+        def add_create_request_mocks(req_mock):
+            req_detail_with_id = expected_req_detail.copy()
+            req_detail_with_id["id"] = mock_req_id
+            req_json_with_id = json.dumps(req_detail_with_id)
+            req_mock.get(
+                self.get_api_endpoint("vtapi/v2/url/report".format(mock_req_id)),
+                text=req_json_with_id)
+
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_url_report_example.py"
+
+        mock_print, req_mock = self.run_sample(
+            sample_file,
+            add_create_request_mocks
+        )
+
+        if req_mock:
+            request_count = len(req_mock.request_history)
+            self.assertEqual(1, request_count)
+
+            new_request = req_mock.request_history[0]
+            expected_request = {"apikey": [self._TEST_API_KEY],
+                                "resource": [self._TEST_RESOURCE]}
+            self.assertEqual(expected_request,
+                             new_request.qs)
+
+        mock_print.assert_called_once_with(
+            StringMatches(self.expected_print_output(expected_req_detail))
+        )
+        mock_print.assert_called_once_with(
+            StringDoesNotMatch("Error invoking request")
+        )
+
+    def test_basic_url_scan_example(self):
+        """
+            Tests the example basic_url_scan_example.py by assessing positive and negative scenarios.
+        """
+        mock_req_id = "123456"
+        expected_detail = {
+            "resource": "http://www.virustotal.com/",
+            "response_code": 1
+        }
+
+        def add_create_request_mocks(req_mock):
+            req_detail_with_id = expected_detail.copy()
+            req_detail_with_id["id"] = mock_req_id
+            domain_json_with_id = json.dumps(req_detail_with_id)
+            req_mock.get(
+                self.get_api_endpoint("vtapi/v2/url/scan".format(mock_req_id)),
+                text=domain_json_with_id)
+
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_url_scan_example.py"
+
+        mock_print, req_mock = self.run_sample(
+            sample_file,
+            add_create_request_mocks
+        )
+
+        if req_mock:
+            request_count = len(req_mock.request_history)
+            self.assertEqual(1, request_count)
+
+            new_request = req_mock.request_history[0]
+            expected_request = {"url": [self._TEST_URL],
+                                "apikey": [self._TEST_API_KEY]}
+            self.assertEqual(expected_request,
+                             new_request.qs)
+
+        mock_print.assert_called_once_with(
+            StringMatches(self.expected_print_output(expected_detail))
+        )
+        mock_print.assert_called_once_with(
+            StringDoesNotMatch("Error invoking request")
+        )
+
