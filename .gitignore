@@ -3,3 +3,4 @@ dist/
 *.pyc
 build/
 dxlvtapiservice.egg-info/
+sample/dxlvtapiservice.config

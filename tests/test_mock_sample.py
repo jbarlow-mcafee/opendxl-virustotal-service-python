@@ -20,8 +20,8 @@ except ImportError:
 
 # pylint: disable=wrong-import-position
 from mock import patch
-import dxlvtapiservice
 import requests_mock
+import dxlvtapiservice
 
 
 class StringMatches(object):
@@ -45,8 +45,8 @@ CONF_FILE_NAME = os.path.dirname(os.path.realpath(__file__)) + '/../config/dxlvt
 
 class VirusTotalTests(unittest.TestCase):
     """
-    This class consists of unit tests for VirusTotal. Each unit test  is mapped to an example published under virustotal 
-    module.
+    This class consists of unit tests for VirusTotal. Each unit test is mapped
+    to an example published under virustotal module.
     """
 
     _TEST_HOSTNAME = "www.virustotal.com"
@@ -64,7 +64,7 @@ class VirusTotalTests(unittest.TestCase):
     def expected_print_output(detail):
         json_string = json.dumps(detail, sort_keys=True,
                                  separators=(".*", ": "))
-        return re.sub("(\.\*)+", ".*",
+        return re.sub(r"(\.\*)+", ".*",
                       re.sub(r"[{[\]}]", ".*", json_string))
 
     @staticmethod
@@ -116,7 +116,8 @@ class VirusTotalTests(unittest.TestCase):
 
     def test_basic_domain_report_example(self):
         """
-            Tests the example basic_domain_report_example.py by assessing positive and negative scenarios.
+        Tests the example basic_domain_report_example.py by assessing
+        positive and negative scenarios.
         """
         mock_domain_id = "123456"
         expected_domain_detail = {
@@ -133,10 +134,11 @@ class VirusTotalTests(unittest.TestCase):
             domain_detail_with_id["id"] = mock_domain_id
             domain_json_with_id = json.dumps(domain_detail_with_id)
             req_mock.get(
-                self.get_api_endpoint("vtapi/v2/domain/report".format(mock_domain_id)),
+                self.get_api_endpoint("vtapi/v2/domain/report"),
                 text=domain_json_with_id)
 
-        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_domain_report_example.py"
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + \
+                      "/../sample/basic/basic_domain_report_example.py"
 
         mock_print, req_mock = self.run_sample(
             sample_file,
@@ -163,7 +165,8 @@ class VirusTotalTests(unittest.TestCase):
 
     def test_basic_file_report_example(self):
         """
-            Tests the example basic_file_report_example.py by assessing positive and negative scenarios.
+        Tests the example basic_file_report_example.py by assessing positive
+        and negative scenarios.
         """
         mock_req_id = "123456"
         expected_req_detail = {
@@ -177,10 +180,11 @@ class VirusTotalTests(unittest.TestCase):
             req_detail_with_id["id"] = mock_req_id
             req_json_with_id = json.dumps(req_detail_with_id)
             req_mock.get(
-                self.get_api_endpoint("vtapi/v2/file/report".format(mock_req_id)),
+                self.get_api_endpoint("vtapi/v2/file/report"),
                 text=req_json_with_id)
 
-        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_file_report_example.py"
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + \
+                      "/../sample/basic/basic_file_report_example.py"
 
         mock_print, req_mock = self.run_sample(
             sample_file,
@@ -192,9 +196,10 @@ class VirusTotalTests(unittest.TestCase):
             self.assertEqual(1, request_count)
 
             new_file_request = req_mock.request_history[0]
-            expected_request = {"apikey": [self._TEST_API_KEY],
-                                "resource": [self._TEST_RESOURCE]
-                                }
+            expected_request = {
+                "apikey": [self._TEST_API_KEY],
+                "resource": [self._TEST_RESOURCE]
+            }
             self.assertEqual(expected_request,
                              new_file_request.qs)
 
@@ -208,23 +213,26 @@ class VirusTotalTests(unittest.TestCase):
 
     def test_basic_file_rescan_example(self):
         """
-            Tests the example basic_file_rescan_example.py by assessing positive and negative scenarios.
+        Tests the example basic_file_rescan_example.py by assessing positive and
+        negative scenarios.
         """
         mock_req_id = "123456"
         expected_req_detail = {
             "resource": "7657fcb7d772448a6d8504e4b20168b8",
             "response_code": 1,
-            "sha256": "54bc950d46a0d1aa72048a17c8275743209e6c17bdacfc4cb9601c9ce3ec9a71" }
+            "sha256": "54bc950d46a0d1aa72048a17c8275743209e6c17bdacfc4cb9601c9ce3ec9a71"
+        }
 
         def add_create_request_mocks(req_mock):
             req_detail_with_id = expected_req_detail.copy()
             req_detail_with_id["id"] = mock_req_id
             req_json_with_id = json.dumps(req_detail_with_id)
             req_mock.get(
-                self.get_api_endpoint("vtapi/v2/file/rescan".format(mock_req_id)),
+                self.get_api_endpoint("vtapi/v2/file/rescan"),
                 text=req_json_with_id)
 
-        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_file_rescan_example.py"
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + \
+                      "/../sample/basic/basic_file_rescan_example.py"
 
         mock_print, req_mock = self.run_sample(
             sample_file,
@@ -236,9 +244,10 @@ class VirusTotalTests(unittest.TestCase):
             self.assertEqual(1, request_count)
 
             new_request = req_mock.request_history[0]
-            expected_request = {"apikey": [self._TEST_API_KEY],
-                                 "resource": [self._TEST_RESOURCE]
-                                }
+            expected_request = {
+                "apikey": [self._TEST_API_KEY],
+                "resource": [self._TEST_RESOURCE]
+            }
             self.assertEqual(expected_request,
                              new_request.qs)
 
@@ -252,25 +261,26 @@ class VirusTotalTests(unittest.TestCase):
 
     def test_basic_ip_address_report_example(self):
         """
-            Tests the example basic_ip_address_report_example.py by assessing positive and negative scenarios.
+        Tests the example basic_ip_address_report_example.py by assessing
+        positive and negative scenarios.
         """
         mock_req_id = "123456"
         expected_detail = {
             "as_owner": ".masterhost autonomous system",
             "asn": 25532,
-            "country": "RU" }
+            "country": "RU"
+        }
 
         def add_create_request_mocks(req_mock):
             req_detail_with_id = expected_detail.copy()
             req_detail_with_id["id"] = mock_req_id
             req_json_with_id = json.dumps(req_detail_with_id)
             req_mock.get(
-                self.get_api_endpoint("vtapi/v2/ip-address/report".format(mock_req_id)),
+                self.get_api_endpoint("vtapi/v2/ip-address/report"),
                 text=req_json_with_id)
-            print "Executed add_create_request_mocks"
-            # check  self._app.VTAPI_URL_FORMAT
 
-        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_ip_address_report_example.py"
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + \
+                      "/../sample/basic/basic_ip_address_report_example.py"
 
         mock_print, req_mock = self.run_sample(
             sample_file,
@@ -297,7 +307,8 @@ class VirusTotalTests(unittest.TestCase):
 
     def test_basic_url_report_example(self):
         """
-            Tests the example basic_url_report_example.py by assessing positive and negative scenarios.
+        Tests the example basic_url_report_example.py by assessing positive and
+        negative scenarios.
         """
         mock_req_id = "123456"
         expected_req_detail = {
@@ -310,10 +321,11 @@ class VirusTotalTests(unittest.TestCase):
             req_detail_with_id["id"] = mock_req_id
             req_json_with_id = json.dumps(req_detail_with_id)
             req_mock.get(
-                self.get_api_endpoint("vtapi/v2/url/report".format(mock_req_id)),
+                self.get_api_endpoint("vtapi/v2/url/report"),
                 text=req_json_with_id)
 
-        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_url_report_example.py"
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + \
+                      "/../sample/basic/basic_url_report_example.py"
 
         mock_print, req_mock = self.run_sample(
             sample_file,
@@ -339,7 +351,8 @@ class VirusTotalTests(unittest.TestCase):
 
     def test_basic_url_scan_example(self):
         """
-            Tests the example basic_url_scan_example.py by assessing positive and negative scenarios.
+        Tests the example basic_url_scan_example.py by assessing positive and
+        negative scenarios.
         """
         mock_req_id = "123456"
         expected_detail = {
@@ -352,10 +365,11 @@ class VirusTotalTests(unittest.TestCase):
             req_detail_with_id["id"] = mock_req_id
             domain_json_with_id = json.dumps(req_detail_with_id)
             req_mock.get(
-                self.get_api_endpoint("vtapi/v2/url/scan".format(mock_req_id)),
+                self.get_api_endpoint("vtapi/v2/url/scan"),
                 text=domain_json_with_id)
 
-        sample_file = os.path.dirname(os.path.realpath(__file__)) + "/../sample/basic/basic_url_scan_example.py"
+        sample_file = os.path.dirname(os.path.realpath(__file__)) + \
+                      "/../sample/basic/basic_url_scan_example.py"
 
         mock_print, req_mock = self.run_sample(
             sample_file,
@@ -378,4 +392,3 @@ class VirusTotalTests(unittest.TestCase):
         mock_print.assert_called_once_with(
             StringDoesNotMatch("Error invoking request")
         )
-
